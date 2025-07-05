@@ -1,0 +1,9 @@
+# Excluir ejecutables compilados
+benchmark_no_opt
+benchmark_opt
+benchmark_no_opt_rs
+benchmark_opt_rs
+
+# Excluir archivos de Python compilados
+*.pyc
+__pycache__/
