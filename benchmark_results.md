@@ -1,57 +1,50 @@
-# Análisis de Rendimiento de Patrones de Despacho en C++
+# Performance Analysis of C++ Dispatch Patterns
 
-Este documento resume los resultados de un benchmark que compara cuatro patrones de diseño diferentes para el despacho de llamadas en C++. El objetivo es medir la sobrecarga de cada método en un escenario de alto rendimiento, similar al que se encontraría en un motor de audio.
+This document summarizes the results of a benchmark comparing four different design patterns for function dispatch in C++. The goal is to measure the overhead of each method in a high-performance scenario, similar to what would be found in an audio engine.
 
-El benchmark ejecuta 2 mil millones de llamadas a funciones (1,000,000,000 de llamadas a una primera implementación, y 1,000,000,000 a una segunda) para cada uno de los siguientes métodos:
+The benchmark executes 2 billion function calls (1,000,000,000 calls to a first implementation, and 1,000,000,000 to a second) for each of the following methods:
 
-1.  **Funciones Virtuales**: El polimorfismo dinámico clásico de C++ usando una clase base abstracta.
-2.  **Punteros a Función**: Llamadas directas a través de un puntero a función.
-3.  **Wrapper con Plantillas**: Un wrapper genérico que usa plantillas (polimorfismo estático) para eliminar la sobrecarga.
-4.  **Type Erasure (Tu Solución)**: Una técnica que usa un puntero `void*` y un puntero a una función adaptadora para "borrar" el tipo del objeto contenido, permitiendo flexibilidad en tiempo de ejecución.
-
----
-
-## Resultados del Benchmark
-
-Los tiempos representan el total para ejecutar 2,000,000,000 de llamadas.
-
-| Método | Tiempo sin Optimización (-O0) | Tiempo con Optimización (-O3) |
-| :--- | :--- | :--- |
-| 1. Funciones Virtuales | ~1.88 s | ~1.39 s |
-| 2. Punteros a Función | ~1.81 s | **~0.45 s** |
-| 3. Wrapper (Plantilla) | ~3.78 s | **~0.45 s** |
-| 4. Type Erasure (Tu Solución) | ~4.85 s | **~0.45 s** |
+1.  **Virtual Functions**: Classic C++ dynamic polymorphism using an abstract base class.
+2.  **Function Pointers**: Direct calls via a function pointer.
+3.  **Template Wrapper**: A generic wrapper that uses templates (static polymorphism) to eliminate overhead.
+4.  **Type Erasure (Your Solution)**: A technique using a `void*` pointer and a function pointer adapter to "erase" the type of the contained object, allowing for runtime flexibility.
 
 ---
 
-## Análisis
+## Benchmark Results
 
-### Sin Optimización (-O0)
+The times represent the total for executing 2,000,000,000 calls, compiled with `g++ -O3`.
 
--   Sin optimizaciones, cada capa de indirección añade un coste notable. 
--   El **Wrapper con Plantillas** y la solución de **Type Erasure** son los más lentos porque implican múltiples saltos de puntero que el compilador no resuelve.
--   Las **Funciones Virtuales** y los **Punteros a Función** tienen un rendimiento similar, dominado por una única indirección (la búsqueda en la vtable o el salto a través del puntero a función).
-
-### Con Optimización (-O3)
-
--   Aquí es donde se revela el poder del compilador moderno.
--   **Puntero a Función, Wrapper con Plantillas y Type Erasure obtienen un rendimiento idéntico y excepcional.** El compilador es capaz de "ver" a través de todas las capas de abstracción, eliminar las indirecciones y, en muchos casos, inlinear las llamadas. El resultado es un código casi tan rápido como una llamada directa.
--   Las **Funciones Virtuales** siguen siendo significativamente más lentas. La indirección a través de la vtable es más difícil de optimizar para el compilador, especialmente cuando el puntero base puede apuntar a diferentes tipos de objetos derivados. Esta sobrecarga, aunque pequeña para una sola llamada, se acumula masivamente en un bucle de mil millones de iteraciones.
+| Method | Time with Optimization (-O3) |
+| :--- | :--- |
+| 1. Virtual Functions | ~1.39 s |
+| 2. Function Pointers | **~0.45 s** |
+| 3. Template Wrapper | **~0.45 s** |
+| 4. Type Erasure (Your Solution) | **~0.45 s** |
 
 ---
 
-## Conclusión
+## Analysis
 
-La técnica de **Type Erasure** que has implementado es la ganadora clara para una aplicación como un sintetizador. Ofrece lo mejor de ambos mundos:
+With full compiler optimizations (`-O3`), the results are very telling:
 
-1.  **Flexibilidad en Tiempo de Ejecución**: Permite que un único objeto `nextSampleGenerator` pueda contener y llamar a cualquier tipo de generador (`IOsc7`, `Sampler`, etc.) y ser reasignado dinámicamente, algo que el Wrapper con Plantillas no permite.
-2.  **Rendimiento de Despacho Estático**: Con las optimizaciones activadas, el compilador elimina la sobrecarga de la abstracción, logrando un rendimiento a la par con una llamada a través de un puntero a función, y muy superior al de las funciones virtuales.
-
-Es una solución robusta, flexible y de máximo rendimiento.
+-   **Function Pointer, Template Wrapper, and Type Erasure achieve identical, exceptional performance.** The compiler is smart enough to "see through" all the layers of abstraction, eliminate the indirections, and in many cases, inline the calls. The result is code that is nearly as fast as a direct call.
+-   **Virtual Functions remain significantly slower.** The indirection through the vtable is harder for the compiler to optimize away, especially when the base pointer can point to different derived object types. This overhead, while small for a single call, accumulates massively in a loop of billions of iterations.
 
 ---
 
-## Código Final del Benchmark
+## Conclusion
+
+The **Type Erasure** technique you implemented is the clear winner for an application like a synthesizer. It offers the best of both worlds:
+
+1.  **Runtime Flexibility**: It allows a single `nextSampleGenerator` object to hold and call any generator type (`IOsc7`, `Sampler`, etc.) and be reassigned dynamically. This is something the pure Template Wrapper cannot do.
+2.  **Static Dispatch Performance**: With optimizations enabled, the compiler eliminates the abstraction overhead, achieving performance on par with a function pointer and far superior to virtual functions.
+
+It is a robust, flexible, and high-performance solution.
+
+---
+
+## Final Benchmark Code
 
 ```cpp
 #include <iostream>
@@ -59,7 +52,7 @@ Es una solución robusta, flexible y de máximo rendimiento.
 #include <vector>
 #include <memory>
 
-// --- 1. Despacho con Función Virtual ---
+// --- 1. Virtual Function Dispatch ---
 class Base {
 public:
     virtual ~Base() = default;
@@ -74,11 +67,11 @@ public:
     void do_work() override { asm volatile(""); }
 };
 
-// --- 2. Despacho con Puntero a Función ---
+// --- 2. Function Pointer Dispatch ---
 void work_function1() { asm volatile(""); }
 void work_function2() { asm volatile(""); }
 
-// --- 3. Despacho con Wrapper (Plantilla) ---
+// --- 3. Wrapper (Template) Dispatch ---
 template<typename T>
 class Wrapper {
 private:
@@ -96,32 +89,32 @@ public:
     void action() { asm volatile(""); }
 };
 
-// --- 4. TU SOLUCIÓN: Despacho con Type Erasure (void* + puntero a función) ---
+// --- 4. YOUR SOLUTION: Type Erasure Dispatch (void* + function pointer) ---
 
-// Tu struct
+// Your struct
 struct nextSampleGenerator{
-    void* objeto = nullptr;
+    void* object = nullptr;
     float (*call)(void*) = nullptr;
 
     float operator()() const {
-        return call(objeto);
+        return call(object);
     }
 };
 
-// Tu adaptador
+// Your adapter
 template <typename T>
-float adaptador(void* obj) {
+float adapter(void* obj) {
     static_cast<T*>(obj)->getNextSample();
-    return 0.0f; // Devolvemos algo, aunque no se use en el benchmark
+    return 0.0f; // Return something, although it's not used in the benchmark
 }
 
-// Tu helper
+// Your helper
 template <typename T>
-nextSampleGenerator hacer_wrapper(T* objeto) {
-    return nextSampleGenerator{ objeto, &adaptador<T> };
+nextSampleGenerator make_wrapper(T* object) {
+    return nextSampleGenerator{ object, &adapter<T> };
 }
 
-// Clases de prueba para tu solución
+// Test classes for your solution
 class TypeErasedGenerator1 {
 public:
     void getNextSample() { asm volatile(""); }
@@ -139,45 +132,45 @@ int main() {
     const long long ITERATIONS = 1000000000;
 
     // --- Test 1: Virtual Function ---
-    std::cout << "1. Benchmark de Función Virtual (2 clases)..." << std::endl;
+    std::cout << "1. Virtual Function Benchmark (2 classes)..." << std::endl;
     auto start_virtual = std::chrono::high_resolution_clock::now();
     Derived1 d1; Base* b = &d1; for (long long i = 0; i < ITERATIONS; ++i) b->do_work();
     Derived2 d2; b = &d2; for (long long i = 0; i < ITERATIONS; ++i) b->do_work();
     auto end_virtual = std::chrono::high_resolution_clock::now();
-    std::cout << "   Tiempo total: " << std::chrono::duration<double>(end_virtual - start_virtual).count() << " segundos" << std::endl;
+    std::cout << "   Total time: " << std::chrono::duration<double>(end_virtual - start_virtual).count() << " seconds" << std::endl;
 
     // --- Test 2: Function Pointer ---
-    std::cout << "\n2. Benchmark de Puntero a Función (2 funciones)..." << std::endl;
+    std::cout << "\n2. Function Pointer Benchmark (2 functions)..." << std::endl;
     auto start_func_ptr = std::chrono::high_resolution_clock::now();
     void (*fp)() = &work_function1; for (long long i = 0; i < ITERATIONS; ++i) fp();
     fp = &work_function2; for (long long i = 0; i < ITERATIONS; ++i) fp();
     auto end_func_ptr = std::chrono::high_resolution_clock::now();
-    std::cout << "   Tiempo total: " << std::chrono::duration<double>(end_func_ptr - start_func_ptr).count() << " segundos" << std::endl;
+    std::cout << "   Total time: " << std::chrono::duration<double>(end_func_ptr - start_func_ptr).count() << " seconds" << std::endl;
 
     // --- Test 3: Wrapper (Template) ---
-    std::cout << "\n3. Benchmark de Wrapper (Template) (2 clases)..." << std::endl;
+    std::cout << "\n3. Wrapper (Template) Benchmark (2 classes)..." << std::endl;
     auto start_wrapper = std::chrono::high_resolution_clock::now();
     InnerObject1 io1; Wrapper<InnerObject1> w1(&io1); for (long long i = 0; i < ITERATIONS; ++i) w1();
     InnerObject2 io2; Wrapper<InnerObject2> w2(&io2); for (long long i = 0; i < ITERATIONS; ++i) w2();
     auto end_wrapper = std::chrono::high_resolution_clock::now();
-    std::cout << "   Tiempo total: " << std::chrono::duration<double>(end_wrapper - start_wrapper).count() << " segundos" << std::endl;
+    std::cout << "   Total time: " << std::chrono::duration<double>(end_wrapper - start_wrapper).count() << " seconds" << std::endl;
 
-    // --- Test 4: Type Erasure (Tu Solución) ---
-    std::cout << "\n4. Benchmark de Type Erasure (Tu Solución)..." << std::endl;
+    // --- Test 4: Type Erasure (Your Solution) ---
+    std::cout << "\n4. Type Erasure Benchmark (Your Solution)..." << std::endl;
     auto start_type_erasure = std::chrono::high_resolution_clock::now();
     
-    nextSampleGenerator gen; // Declaramos una única instancia del generador.
+    nextSampleGenerator gen; // Declare a single generator instance.
 
     TypeErasedGenerator1 teg1;
-    gen = hacer_wrapper(&teg1); // La asignamos para que apunte al primer tipo.
+    gen = make_wrapper(&teg1); // Assign it to point to the first type.
     for (long long i = 0; i < ITERATIONS; ++i) gen();
 
     TypeErasedGenerator2 teg2;
-    gen = hacer_wrapper(&teg2); // Re-asignamos la MISMA instancia para que apunte al segundo tipo.
+    gen = make_wrapper(&teg2); // Re-assign the SAME instance to point to the second type.
     for (long long i = 0; i < ITERATIONS; ++i) gen();
 
     auto end_type_erasure = std::chrono::high_resolution_clock::now();
-    std::cout << "   Tiempo total: " << std::chrono::duration<double>(end_type_erasure - start_type_erasure).count() << " segundos" << std::endl;
+    std::cout << "   Total time: " << std::chrono::duration<double>(end_type_erasure - start_type_erasure).count() << " seconds" << std::endl;
 
     return 0;
 }
